@@ -95,12 +95,12 @@ class DashboardDAO:
                 round(COALESCE(SUM(t."WIP_CURRENT_MONTH"), 0)::numeric/100, 3) as total_wip_current_month,
                 round(COALESCE(SUM(t."WIP_TOTAL"), 0)::numeric/100, 3) as total_wip_total,
                 round(COALESCE(AVG(t."PHYSICAL_PROGRESS"), 0)::numeric, 3) as avg_physical_progress,
-                t."SANCTION_DATE" as earliest_sanction_date,
-                t."SANCTION_DATE" as latest_sanction_date,
-                t."FUND_RECEIVED_DATE" as earliest_fund_received_date,
-                t."FUND_RECEIVED_DATE" as latest_fund_received_date,
-                (t."LAND_RECEIVED_DATE") as earliest_land_received_date,
-                (t."LAND_RECEIVED_DATE") as latest_land_received_date,
+                MIN(t."SANCTION_DATE") as earliest_sanction_date,
+                MAX(t."SANCTION_DATE") as latest_sanction_date,
+                MIN(t."FUND_RECEIVED_DATE") as earliest_fund_received_date,
+                MAX(t."FUND_RECEIVED_DATE") as latest_fund_received_date,
+                MIN(t."LAND_RECEIVED_DATE") as earliest_land_received_date,
+                MAX(t."LAND_RECEIVED_DATE") as latest_land_received_date,
                 COUNT(DISTINCT t."DISTRICT_CODE") as total_districts,
                 COUNT(DISTINCT t."WORK_CODE") as total_work_codes
             FROM "DEPT_DTLS" d

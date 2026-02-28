@@ -18,15 +18,28 @@ class Database:
     
     def _initialize_pool(self):
         if self.pool is None:
+            # Get SSL mode
+            sslmode = os.getenv("PGSSLMODE", "prefer")
+            
+            # Build connection parameters
+            conn_params = {
+                "host": os.getenv("PGHOST", os.getenv("DB_HOST", "localhost")),
+                "port": os.getenv("PGPORT", os.getenv("DB_PORT", "5432")),
+                "database": os.getenv("PGDATABASE", os.getenv("DB_NAME", "mydb")),
+                "user": os.getenv("PGUSER", os.getenv("DB_USER", "postgres")),
+                "password": os.getenv("PGPASSWORD", os.getenv("DB_PASSWORD", "")),
+                "sslmode": sslmode,
+            }
+            
+            # Add channel binding if specified (required for Neon)
+            channel_binding = os.getenv("PGCHANNELBINDING")
+            if channel_binding:
+                conn_params["channel_binding"] = channel_binding
+            
             self.pool = SimpleConnectionPool(
                 minconn=1,
                 maxconn=10,
-                host=os.getenv("PGHOST", os.getenv("DB_HOST", "localhost")),
-                port=os.getenv("PGPORT", os.getenv("DB_PORT", "5432")),
-                database=os.getenv("PGDATABASE", os.getenv("DB_NAME", "mydb")),
-                user=os.getenv("PGUSER", os.getenv("DB_USER", "postgres")),
-                password=os.getenv("PGPASSWORD", os.getenv("DB_PASSWORD", "")),
-                sslmode=os.getenv("PGSSLMODE", "prefer")
+                **conn_params
             )
     
     def get_connection(self):
