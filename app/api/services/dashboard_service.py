@@ -168,3 +168,19 @@ class DashboardService:
                 "error": str(e)
             }
 
+
+    def get_completion_stage_counts(self, tndr_pk: int):
+        """Get aggregated project counts by completion stages"""
+        try:
+            data = self.dashboard_dao.get_completion_stage_counts(tndr_pk)
+            return {
+                "success": True,
+                "data": data
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e)
+            }

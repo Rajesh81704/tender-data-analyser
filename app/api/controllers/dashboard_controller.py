@@ -91,3 +91,12 @@ def get_department_completion_summary(
     return result
 
 
+
+@router.get("/completion-stage-counts")
+def get_completion_stage_counts(
+    tndr_id: int = Query(..., description="Tender primary key"),
+    dashboard_service: DashboardService = Depends(get_dashboard_service)
+):
+    """Get aggregated project counts by completion stages (<25%, 25-50%, 50-75%, 75-100%, Completed)"""
+    result = dashboard_service.get_completion_stage_counts(tndr_id)
+    return result

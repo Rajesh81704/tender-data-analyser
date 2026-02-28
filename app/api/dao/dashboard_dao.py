@@ -614,3 +614,68 @@ class DashboardDAO:
             if conn:
                 self.db.release_connection(conn)
 
+
+    def get_completion_stage_counts(self, tndr_pk: int):
+        """Get aggregated project counts by completion stages"""
+        conn = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            query = f"""
+            WITH progress_data AS (
+                SELECT
+                    t."TDM_PK",
+                    COALESCE(
+                        (t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100,
+                        0
+                    ) AS physical_progress
+                FROM "TENDER_DATA_DTLS" t
+                WHERE t.tndr_pk = {tndr_pk}
+            )
+            SELECT
+                COUNT(*) FILTER (WHERE physical_progress < 25) AS below_25,
+                COUNT(*) FILTER (WHERE physical_progress >= 25 AND physical_progress < 50) AS between_25_50,
+                COUNT(*) FILTER (WHERE physical_progress >= 50 AND physical_progress < 75) AS between_50_75,
+                COUNT(*) FILTER (WHERE physical_progress >= 75 AND physical_progress < 100) AS between_75_100,
+                COUNT(*) FILTER (WHERE physical_progress >= 100) AS completed,
+                COUNT(*) AS total_projects
+            FROM progress_data
+            """
+
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+
+            if result:
+                return {
+                    'below_25': result[0],
+                    'between_25_50': result[1],
+                    'between_50_75': result[2],
+                    'between_75_100': result[3],
+                    'completed': result[4],
+                    'total_projects': result[5]
+                }
+            return {
+                'below_25': 0,
+                'between_25_50': 0,
+                'between_50_75': 0,
+                'between_75_100': 0,
+                'completed': 0,
+                'total_projects': 0
+            }
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                'below_25': 0,
+                'between_25_50': 0,
+                'between_50_75': 0,
+                'between_75_100': 0,
+                'completed': 0,
+                'total_projects': 0
+            }
+        finally:
+            if conn:
+                self.db.release_connection(conn)
