@@ -79,20 +79,30 @@ class DashboardDAO:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            # Build query with proper aggregation per department
+            # Build query with all tender fields aggregated per department
             query = f"""
             SELECT 
                 d."DEPT_SUB_DEPT_CODE",
                 d."DEPT_NAME",
                 d."SUB_DEPT_NAME",
                 COUNT(t."TDM_PK") as total_projects,
-                1 as total_departments,
                 round(COALESCE(SUM(t."SANCTION_COST"), 0)::numeric/100, 3) as total_sanction_cost,
                 round(COALESCE(SUM(t."FUND_RECEIVED"), 0)::numeric/100, 3) as total_fund_received,
                 round((COALESCE(SUM(t."SANCTION_COST"), 0)::numeric - COALESCE(SUM(t."FUND_RECEIVED"), 0)::numeric)::numeric, 3) as total_fund_pending,
                 round((COALESCE(SUM(t."FUND_RECEIVED"), 0)::numeric - COALESCE(SUM(t."WIP_TOTAL"), 0)::numeric)::numeric, 3) as total_fund_pending_to_utilize,
-                COALESCE(SUM(t."WIP_TOTAL"), 0) as total_fund_utilized,
-                round(COALESCE(AVG(t."PHYSICAL_PROGRESS"), 0)::numeric, 3) as avg_physical_progress
+                round(COALESCE(SUM(t."WIP_PREVIOUS_YEAR"), 0)::numeric/100, 3) as total_wip_previous_year,
+                round(COALESCE(SUM(t."WIP_CURRENT_YEAR"), 0)::numeric/100, 3) as total_wip_current_year,
+                round(COALESCE(SUM(t."WIP_CURRENT_MONTH"), 0)::numeric/100, 3) as total_wip_current_month,
+                round(COALESCE(SUM(t."WIP_TOTAL"), 0)::numeric/100, 3) as total_wip_total,
+                round(COALESCE(AVG(t."PHYSICAL_PROGRESS"), 0)::numeric, 3) as avg_physical_progress,
+                MIN(t."SANCTION_DATE") as earliest_sanction_date,
+                MAX(t."SANCTION_DATE") as latest_sanction_date,
+                MIN(t."FUND_RECEIVED_DATE") as earliest_fund_received_date,
+                MAX(t."FUND_RECEIVED_DATE") as latest_fund_received_date,
+                MIN(t."LAND_RECEIVED_DATE") as earliest_land_received_date,
+                MAX(t."LAND_RECEIVED_DATE") as latest_land_received_date,
+                COUNT(DISTINCT t."DISTRICT_CODE") as total_districts,
+                COUNT(DISTINCT t."WORK_CODE") as total_work_codes
             FROM "DEPT_DTLS" d
             LEFT JOIN "TENDER_DATA_DTLS" t 
                 ON d.tndr_pk = t.tndr_pk 
@@ -123,10 +133,16 @@ class DashboardDAO:
             results = cursor.fetchall()
             cursor.close()
             
-            columns = ['dept_code', 'dept_name', 'sub_dept_name', 'total_projects', 
-                      'total_departments', 'total_sanction_cost', 'total_fund_received',
-                      'total_fund_pending', 'total_fund_pending_to_utilize', 
-                      'total_fund_utilized', 'avg_physical_progress']
+            columns = [
+                'dept_code', 'dept_name', 'sub_dept_name', 'total_projects',
+                'total_sanction_cost', 'total_fund_received', 'total_fund_pending',
+                'total_fund_pending_to_utilize', 'total_wip_previous_year',
+                'total_wip_current_year', 'total_wip_current_month', 'total_wip_total',
+                'avg_physical_progress', 'earliest_sanction_date', 'latest_sanction_date',
+                'earliest_fund_received_date', 'latest_fund_received_date',
+                'earliest_land_received_date', 'latest_land_received_date',
+                'total_districts', 'total_work_codes'
+            ]
             
             items = [dict(zip(columns, row)) for row in results]
             
@@ -142,7 +158,7 @@ class DashboardDAO:
             }
             
             # Cache the result
-            redis_client.set(cache_key, json.dumps(response), ex=self.cache_ttl)
+            redis_client.set(cache_key, json.dumps(response, default=str), ex=self.cache_ttl)
             
             return response
             
