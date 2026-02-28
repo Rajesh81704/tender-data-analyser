@@ -8,12 +8,6 @@ __pycache__/
 *.so
 .Python
 
-# Virtual environment
-.venv/
-venv/
-ENV/
-env/
-
 # IDE
 .vscode/
 .idea/
