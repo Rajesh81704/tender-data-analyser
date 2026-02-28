@@ -100,3 +100,12 @@ def get_completion_stage_counts(
     """Get aggregated project counts by completion stages (<25%, 25-50%, 50-75%, 75-100%, Completed)"""
     result = dashboard_service.get_completion_stage_counts(tndr_id)
     return result
+
+@router.delete("/tender/{tndr_id}")
+def delete_tender(
+    tndr_id: int,
+    dashboard_service: DashboardService = Depends(get_dashboard_service)
+):
+    """Delete tender and all related records from all tables (tender_master, TENDER_DATA_DTLS, DEPT_DTLS, DISTRICT_DETAILS)"""
+    result = dashboard_service.delete_tender_by_pk(tndr_id)
+    return result

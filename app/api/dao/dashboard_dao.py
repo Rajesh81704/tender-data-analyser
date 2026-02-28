@@ -679,3 +679,58 @@ class DashboardDAO:
         finally:
             if conn:
                 self.db.release_connection(conn)
+
+    def delete_tender_by_pk(self, tndr_pk: int):
+        """Delete tender and all related records from all tables"""
+        conn = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            # Delete in order due to foreign key constraints
+            # First delete child records, then parent
+            
+            # Delete from TENDER_DATA_DTLS
+            cursor.execute(f'DELETE FROM "TENDER_DATA_DTLS" WHERE tndr_pk = {tndr_pk}')
+            tender_data_deleted = cursor.rowcount
+            
+            # Delete from DEPT_DTLS
+            cursor.execute(f'DELETE FROM "DEPT_DTLS" WHERE tndr_pk = {tndr_pk}')
+            dept_deleted = cursor.rowcount
+            
+            # Delete from DISTRICT_DETAILS
+            cursor.execute(f'DELETE FROM "DISTRICT_DETAILS" WHERE tndr_pk = {tndr_pk}')
+            district_deleted = cursor.rowcount
+            
+            # Finally delete from tender_master
+            cursor.execute(f'DELETE FROM tender_master WHERE tndr_pk = {tndr_pk}')
+            master_deleted = cursor.rowcount
+            
+            # Commit the transaction
+            conn.commit()
+            cursor.close()
+
+            return {
+                'deleted': True,
+                'tndr_pk': tndr_pk,
+                'records_deleted': {
+                    'tender_master': master_deleted,
+                    'tender_data_dtls': tender_data_deleted,
+                    'dept_dtls': dept_deleted,
+                    'district_details': district_deleted,
+                    'total': master_deleted + tender_data_deleted + dept_deleted + district_deleted
+                }
+            }
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            import traceback
+            traceback.print_exc()
+            return {
+                'deleted': False,
+                'error': str(e)
+            }
+        finally:
+            if conn:
+                self.db.release_connection(conn)

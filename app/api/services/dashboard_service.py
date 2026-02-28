@@ -184,3 +184,26 @@ class DashboardService:
                 "success": False,
                 "error": str(e)
             }
+
+    def delete_tender_by_pk(self, tndr_pk: int):
+        """Delete tender and all related records"""
+        try:
+            result = self.dashboard_dao.delete_tender_by_pk(tndr_pk)
+            if result.get('deleted'):
+                return {
+                    "success": True,
+                    "message": f"Successfully deleted tender with tndr_pk={tndr_pk}",
+                    "data": result
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.get('error', 'Unknown error occurred')
+                }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e)
+            }
