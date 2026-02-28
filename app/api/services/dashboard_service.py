@@ -21,10 +21,10 @@ class DashboardService:
                 "error": str(e)
             }
     
-    def get_department_wise_stats(self, tndr_pk: int, dept_code: str = None):
+    def get_department_wise_stats(self, tndr_pk: int, dept_name: str = None):
         """Get department-wise statistics"""
         try:
-            data = self.dashboard_dao.get_department_wise_stats(tndr_pk, dept_code)
+            data = self.dashboard_dao.get_department_wise_stats(tndr_pk, dept_name)
             return {
                 "success": True,
                 "data": data

@@ -68,9 +68,9 @@ class DashboardDAO:
         
                 
 
-    def get_department_wise_stats(self, tndr_pk: int, dept_code: str = None):
+    def get_department_wise_stats(self, tndr_pk: int, dept_name: str = None):
         """Get department-wise statistics for a specific tender"""
-        cache_key = f"dashboard:dept_stats:{tndr_pk}:{dept_code or 'all'}"
+        cache_key = f"dashboard:dept_stats:{tndr_pk}:{dept_name or 'all'}"
         
         # Try cache first
         cached = redis_client.get(cache_key)
@@ -84,9 +84,9 @@ class DashboardDAO:
             
             query = query_loader.get_query("query.dashboard.get_dept_wise_stats")
             
-            if dept_code:
+            if dept_name:
                 query += ' AND d."DEPT_NAME" = %s'
-                cursor.execute(query, (tndr_pk, dept_code))
+                cursor.execute(query, (tndr_pk, dept_name))
             else:
                 cursor.execute(query, (tndr_pk,))
             

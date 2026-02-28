@@ -22,7 +22,7 @@ def get_department_wise_stats(
     dashboard_service: DashboardService = Depends(get_dashboard_service)
 ):
     """Get department-wise tender statistics"""
-    result = dashboard_service.get_department_wise_stats(tndr_id, dept_code)
+    result = dashboard_service.get_department_wise_stats(tndr_id, dept_name)
     return result
 
 @router.get("/department-projects")
