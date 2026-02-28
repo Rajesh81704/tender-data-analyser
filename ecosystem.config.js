@@ -2,7 +2,7 @@ module.exports = {
   apps: [{
     name: 'tender-api',
     script: '.venv/bin/uvicorn',
-    args: 'app.main:app --host 0.0.0.0 --port 9000',
+    args: 'app.main:app --host 0.0.0.0 --port 8001',
     cwd: '/root/tender-data-analyser-v2',
     instances: 1,
     autorestart: true,
