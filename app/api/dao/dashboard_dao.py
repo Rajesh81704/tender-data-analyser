@@ -65,14 +65,11 @@ class DashboardDAO:
         finally:
             if conn:
                 self.db.release_connection(conn)
-        
-                
 
-    def get_department_wise_stats(self, tndr_pk: int, dept_name: str = None):
-        """Get department-wise statistics for a specific tender"""
-        cache_key = f"dashboard:dept_stats:{tndr_pk}:{dept_name or 'all'}"
+    def get_department_wise_stats(self, tndr_pk: int, dept_code: str = None, page: int = 1, page_size: int = 10):
+        """Get department-wise statistics for a specific tender with pagination"""
+        cache_key = f"dashboard:dept_stats:{tndr_pk}:{dept_code or 'all'}:{page}:{page_size}"
         
-        # Try cache first
         cached = redis_client.get(cache_key)
         if cached:
             return json.loads(cached)
@@ -82,13 +79,46 @@ class DashboardDAO:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            query = query_loader.get_query("query.dashboard.get_dept_wise_stats")
+            # Build query with proper aggregation per department
+            query = f"""
+            SELECT 
+                d."DEPT_SUB_DEPT_CODE",
+                d."DEPT_NAME",
+                d."SUB_DEPT_NAME",
+                COUNT(t."TDM_PK") as total_projects,
+                1 as total_departments,
+                round(COALESCE(SUM(t."SANCTION_COST"), 0)::numeric/100, 3) as total_sanction_cost,
+                round(COALESCE(SUM(t."FUND_RECEIVED"), 0)::numeric/100, 3) as total_fund_received,
+                round((COALESCE(SUM(t."SANCTION_COST"), 0)::numeric - COALESCE(SUM(t."FUND_RECEIVED"), 0)::numeric)::numeric, 3) as total_fund_pending,
+                round((COALESCE(SUM(t."FUND_RECEIVED"), 0)::numeric - COALESCE(SUM(t."WIP_TOTAL"), 0)::numeric)::numeric, 3) as total_fund_pending_to_utilize,
+                COALESCE(SUM(t."WIP_TOTAL"), 0) as total_fund_utilized,
+                round(COALESCE(AVG(t."PHYSICAL_PROGRESS"), 0)::numeric, 3) as avg_physical_progress
+            FROM "DEPT_DTLS" d
+            LEFT JOIN "TENDER_DATA_DTLS" t 
+                ON d.tndr_pk = t.tndr_pk 
+                AND d."DEPT_SUB_DEPT_CODE" = t."DEPARTMENT_CODE"
+            WHERE d.tndr_pk = {tndr_pk}
+            """
             
-            if dept_name:
-                query += ' AND d."DEPT_NAME" = %s'
-                cursor.execute(query, (tndr_pk, dept_name))
-            else:
-                cursor.execute(query, (tndr_pk,))
+            if dept_code:
+                query += f" AND d.\"DEPT_SUB_DEPT_CODE\" = '{dept_code}'"
+            
+            group_by = ' GROUP BY d."DEPT_SUB_DEPT_CODE", d."DEPT_NAME", d."SUB_DEPT_NAME"'
+            
+            # Count total items
+            count_query = f"SELECT COUNT(*) FROM ({query}{group_by}) as count_table"
+            cursor.execute(count_query)
+            total_items = cursor.fetchone()[0]
+            
+            # Calculate pagination
+            total_pages = (total_items + page_size - 1) // page_size
+            offset = (page - 1) * page_size
+            
+            # Build final query with pagination
+            query += group_by
+            query += f' LIMIT {page_size} OFFSET {offset}'
+            
+            cursor.execute(query)
             
             results = cursor.fetchall()
             cursor.close()
@@ -98,27 +128,41 @@ class DashboardDAO:
                       'total_fund_pending', 'total_fund_pending_to_utilize', 
                       'total_fund_utilized', 'avg_physical_progress']
             
-            data = [dict(zip(columns, row)) for row in results]
+            items = [dict(zip(columns, row)) for row in results]
             
             # Convert Decimal to float before caching
-            data = decimal_to_float(data)
+            items = decimal_to_float(items)
+            
+            response = {
+                "items": items,
+                "page": page,
+                "page_size": page_size,
+                "total_items": total_items,
+                "total_pages": total_pages
+            }
             
             # Cache the result
-            redis_client.set(cache_key, json.dumps(data), ex=self.cache_ttl)
+            redis_client.set(cache_key, json.dumps(response), ex=self.cache_ttl)
             
-            return data
+            return response
             
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return []
+            return {
+                "items": [],
+                "page": page,
+                "page_size": page_size,
+                "total_items": 0,
+                "total_pages": 0
+            }
         finally:
             if conn:
                 self.db.release_connection(conn)
 
-    def get_department_projects(self, tndr_pk: int, dept_code: str = None):
-        """Get all project details department-wise"""
-        cache_key = f"dashboard:dept_projects:{tndr_pk}:{dept_code or 'all'}"
+    def get_department_projects(self, tndr_pk: int, dept_code: str = None, page: int = 1, page_size: int = 10):
+        """Get all project details department-wise with pagination"""
+        cache_key = f"dashboard:dept_projects:{tndr_pk}:{dept_code or 'all'}:{page}:{page_size}"
         
         # Try cache first
         cached = redis_client.get(cache_key)
@@ -130,13 +174,30 @@ class DashboardDAO:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            query = query_loader.get_query("query.dashboard.get_dept_projects")
+            # Get base query from properties file
+            base_query = query_loader.get_query("query.dashboard.get_dept_projects")
+            
+            # Build WHERE clause with direct parameter insertion
+            where_clause = f' WHERE mst.tndr_pk = {tndr_pk} AND d.tndr_pk = {tndr_pk} AND dist.tndr_pk = {tndr_pk}'
             
             if dept_code:
-                query = query.replace(' ORDER BY', ' AND d."DEPT_NAME" = %s ORDER BY')
-                cursor.execute(query, (tndr_pk, tndr_pk, tndr_pk, dept_code))
-            else:
-                cursor.execute(query, (tndr_pk, tndr_pk, tndr_pk))
+                where_clause += f" AND d.\"DEPT_SUB_DEPT_CODE\" = '{dept_code}'"
+            
+            # Count total items
+            count_query = f"SELECT COUNT(*) FROM ({base_query}{where_clause}) as count_table"
+            cursor.execute(count_query)
+            total_items = cursor.fetchone()[0]
+            
+            # Calculate pagination
+            total_pages = (total_items + page_size - 1) // page_size
+            offset = (page - 1) * page_size
+            
+            # Build final query with pagination
+            query = base_query + where_clause
+            query += ' ORDER BY d."DEPT_SUB_DEPT_CODE", t."PROJECT_NAME"'
+            query += f' LIMIT {page_size} OFFSET {offset}'
+            
+            cursor.execute(query)
             
             results = cursor.fetchall()
             cursor.close()
@@ -151,20 +212,34 @@ class DashboardDAO:
                 'wip_current_month', 'wip_total', 'physical_progress', 'physical_progress_remark'
             ]
             
-            data = [dict(zip(columns, row)) for row in results]
+            items = [dict(zip(columns, row)) for row in results]
             
             # Convert Decimal to float before caching
-            data = decimal_to_float(data)
+            items = decimal_to_float(items)
+            
+            response = {
+                "items": items,
+                "page": page,
+                "page_size": page_size,
+                "total_items": total_items,
+                "total_pages": total_pages
+            }
             
             # Cache the result (use default=str for dates)
-            redis_client.set(cache_key, json.dumps(data, default=str), ex=self.cache_ttl)
+            redis_client.set(cache_key, json.dumps(response, default=str), ex=self.cache_ttl)
             
-            return data
+            return response
             
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return []
+            return {
+                "items": [],
+                "page": page,
+                "page_size": page_size,
+                "total_items": 0,
+                "total_pages": 0
+            }
         finally:
             if conn:
                 self.db.release_connection(conn)
@@ -229,8 +304,15 @@ class DashboardDAO:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
+            # Get base query from properties file
             query = query_loader.get_query("query.dashboard.get_dept_completion_status")
-            cursor.execute(query, (tndr_pk,))
+            
+            # Build WHERE clause with direct parameter insertion
+            query += f' WHERE d."DEPT_NAME" IS NOT NULL AND t.tndr_pk = {tndr_pk}'
+            query += ' GROUP BY d."DEPT_NAME", t."PHYSICAL_PROGRESS_REMARK", t."PHYSICAL_PROGRESS"'
+            query += ' ORDER BY d."DEPT_NAME", t."PHYSICAL_PROGRESS_REMARK"'
+            
+            cursor.execute(query)
             
             results = cursor.fetchall()
             cursor.close()
@@ -292,9 +374,9 @@ class DashboardDAO:
             if conn:
                 self.db.release_connection(conn)
 
-    def get_project_stage_summary(self, tndr_pk: int, project_name: str = None, department_name: str = None):
-        """Get project stage summary with completion percentage and stage categorization"""
-        cache_key = f"dashboard:project_stage:{tndr_pk}:{project_name or 'all'}:{department_name or 'all'}"
+    def get_project_stage_summary(self, tndr_pk: int, page: int = 1, page_size: int = 10):
+        """Get project stage summary with completion percentage and stage categorization with pagination"""
+        cache_key = f"dashboard:project_stage:{tndr_pk}:{page}:{page_size}"
         
         # Try cache first
         cached = redis_client.get(cache_key)
@@ -306,19 +388,26 @@ class DashboardDAO:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            query = query_loader.get_query("query.dashboard.get_project_stage_summary")
-            params = [tndr_pk]
+            base_query = query_loader.get_query("query.dashboard.get_project_stage_summary")
+            where_clause = f' AND t.tndr_pk = {tndr_pk}'
             
-            if project_name:
-                query += ' AND t."PROJECT_NAME" ILIKE %s'
-                params.append(f'%{project_name}%')
-            elif department_name:
-                query += ' AND d."DEPT_NAME" ILIKE %s'
-                params.append(f'%{department_name}%')
+            group_by = ' GROUP BY t."PROJECT_NAME", d."DEPT_NAME", t."PHYSICAL_PROGRESS"'
             
-            query += ' GROUP BY t."PROJECT_NAME", d."DEPT_NAME", t."PHYSICAL_PROGRESS" ORDER BY completion_percentage DESC'
+            # Count total items
+            count_query = f"SELECT COUNT(*) FROM ({base_query}{where_clause}{group_by}) as count_table"
+            cursor.execute(count_query)
+            total_items = cursor.fetchone()[0]
             
-            cursor.execute(query, tuple(params))
+            # Calculate pagination
+            total_pages = (total_items + page_size - 1) // page_size
+            offset = (page - 1) * page_size
+            
+            # Build final query with pagination
+            query = base_query + where_clause + group_by
+            query += ' ORDER BY completion_percentage DESC'
+            query += f' LIMIT {page_size} OFFSET {offset}'
+            
+            cursor.execute(query)
             
             results = cursor.fetchall()
             cursor.close()
@@ -326,20 +415,34 @@ class DashboardDAO:
             columns = ['project_name', 'sanctioned', 'received', 'department', 
                       'completion_percentage', 'project_stage']
             
-            data = [dict(zip(columns, row)) for row in results]
+            items = [dict(zip(columns, row)) for row in results]
             
             # Convert Decimal to float before caching
-            data = decimal_to_float(data)
+            items = decimal_to_float(items)
+            
+            response = {
+                "items": items,
+                "page": page,
+                "page_size": page_size,
+                "total_items": total_items,
+                "total_pages": total_pages
+            }
             
             # Cache the result
-            redis_client.set(cache_key, json.dumps(data), ex=self.cache_ttl)
+            redis_client.set(cache_key, json.dumps(response), ex=self.cache_ttl)
             
-            return data
+            return response
             
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return []
+            return {
+                "items": [],
+                "page": page,
+                "page_size": page_size,
+                "total_items": 0,
+                "total_pages": 0
+            }
         finally:
             if conn:
                 self.db.release_connection(conn)

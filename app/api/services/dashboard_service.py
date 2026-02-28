@@ -21,13 +21,19 @@ class DashboardService:
                 "error": str(e)
             }
     
-    def get_department_wise_stats(self, tndr_pk: int, dept_name: str = None):
-        """Get department-wise statistics"""
+    def get_department_wise_stats(self, tndr_pk: int, dept_code: str = None, page: int = 1, page_size: int = 10):
+        """Get department-wise statistics with pagination"""
         try:
-            data = self.dashboard_dao.get_department_wise_stats(tndr_pk, dept_name)
+            data = self.dashboard_dao.get_department_wise_stats(tndr_pk, dept_code, page, page_size)
             return {
                 "success": True,
-                "data": data
+                "data": data.get("items", []),
+                "pagination": {
+                    "page": data.get("page", page),
+                    "page_size": data.get("page_size", page_size),
+                    "total_items": data.get("total_items", 0),
+                    "total_pages": data.get("total_pages", 0)
+                }
             }
         except Exception as e:
             import traceback
@@ -37,13 +43,19 @@ class DashboardService:
                 "error": str(e)
             }
 
-    def get_department_projects(self, tndr_pk: int, dept_code: str = None):
-        """Get all project details department-wise"""
+    def get_department_projects(self, tndr_pk: int, dept_code: str = None, page: int = 1, page_size: int = 10):
+        """Get all project details department-wise with pagination"""
         try:
-            data = self.dashboard_dao.get_department_projects(tndr_pk, dept_code)
+            data = self.dashboard_dao.get_department_projects(tndr_pk, dept_code, page, page_size)
             return {
                 "success": True,
-                "data": data
+                "data": data.get("items", []),
+                "pagination": {
+                    "page": data.get("page", page),
+                    "page_size": data.get("page_size", page_size),
+                    "total_items": data.get("total_items", 0),
+                    "total_pages": data.get("total_pages", 0)
+                }
             }
         except Exception as e:
             import traceback
@@ -101,13 +113,19 @@ class DashboardService:
                 "error": str(e)
             }
 
-    def get_project_stage_summary(self, tndr_pk: int, project_name: str = None, department_name: str = None):
-        """Get project stage summary with completion percentage and stage categorization"""
+    def get_project_stage_summary(self, tndr_pk: int, page: int = 1, page_size: int = 10):
+        """Get project stage summary with completion percentage and stage categorization with pagination"""
         try:
-            data = self.dashboard_dao.get_project_stage_summary(tndr_pk, project_name, department_name)
+            data = self.dashboard_dao.get_project_stage_summary(tndr_pk, page, page_size)
             return {
                 "success": True,
-                "data": data
+                "data": data.get("items", []),
+                "pagination": {
+                    "page": data.get("page", page),
+                    "page_size": data.get("page_size", page_size),
+                    "total_items": data.get("total_items", 0),
+                    "total_pages": data.get("total_pages", 0)
+                }
             }
         except Exception as e:
             import traceback

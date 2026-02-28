@@ -19,20 +19,24 @@ def get_dashboard_stats(
 def get_department_wise_stats(
     tndr_id: int = Query(..., description="Tender primary key"),
     dept_code: str = Query(None, description="Optional department code filter"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    page_size: int = Query(10, ge=1, le=100, description="Number of items per page (max 100)"),
     dashboard_service: DashboardService = Depends(get_dashboard_service)
 ):
-    """Get department-wise tender statistics"""
-    result = dashboard_service.get_department_wise_stats(tndr_id, dept_name)
+    """Get department-wise tender statistics with pagination"""
+    result = dashboard_service.get_department_wise_stats(tndr_id, dept_code, page, page_size)
     return result
 
 @router.get("/department-projects")
 def get_department_projects(
     tndr_id: int = Query(..., description="Tender primary key"),
-    dept_name: str = Query(None, description="Optional department name filter (e.g., 'POLYTECHNICS')"),
+    dept_code: str = Query(None, description="Optional department code"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    page_size: int = Query(10, ge=1, le=100, description="Number of items per page (max 100)"),
     dashboard_service: DashboardService = Depends(get_dashboard_service)
 ):
-    """Get all project details department-wise"""
-    result = dashboard_service.get_department_projects(tndr_id, dept_name)
+    """Get all project details department-wise with pagination"""
+    result = dashboard_service.get_department_projects(tndr_id, dept_code, page, page_size)
     return result
 
 @router.get("/fund-flow")
@@ -65,11 +69,11 @@ def get_project_wise_details(
 @router.get("/projects/by-completion")
 def get_projects_by_completion(
     tndr_id: int = Query(..., description="Tender primary key"),
-    project_name: str = Query(None, description="Filter by project name"),
-    department_name: str = Query(None, description="Filter by department name"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    page_size: int = Query(10, ge=1, le=100, description="Number of items per page (max 100)"),
     dashboard_service: DashboardService = Depends(get_dashboard_service)
 ):
-    """Get project stage summary with completion percentage and stage categorization (Completed, >=75%, >=50%, >=25%, <25%)"""
-    result = dashboard_service.get_project_stage_summary(tndr_id, project_name, department_name)
+    """Get project stage summary with completion percentage and stage categorization (Completed, >=75%, >=50%, >=25%, <25%) with pagination"""
+    result = dashboard_service.get_project_stage_summary(tndr_id, page, page_size)
     return result
 
