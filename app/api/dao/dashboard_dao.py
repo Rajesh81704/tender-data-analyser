@@ -343,3 +343,44 @@ class DashboardDAO:
         finally:
             if conn:
                 self.db.release_connection(conn)
+
+    def get_all_tender_masters(self):
+        """Get all tender master records"""
+        cache_key = "dashboard:all_tender_masters"
+        
+        # Try cache first
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+        
+        conn = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            query = query_loader.get_query("query.dashboard.get_all_tender_masters")
+            cursor.execute(query)
+            
+            results = cursor.fetchall()
+            cursor.close()
+            
+            columns = ['tndr_pk', 'tndr_source_file', 'dst_source_file', 
+                      'dept_source_file', 'created_date', 'created_user']
+            
+            data = [dict(zip(columns, row)) for row in results]
+            
+            # Convert Decimal to float before caching
+            data = decimal_to_float(data)
+            
+            # Cache the result (use default=str for dates)
+            redis_client.set(cache_key, json.dumps(data, default=str), ex=self.cache_ttl)
+            
+            return data
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return []
+        finally:
+            if conn:
+                self.db.release_connection(conn)

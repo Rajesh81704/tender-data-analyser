@@ -2,9 +2,15 @@ import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
-# Load environment variables
-load_dotenv('app/.env')
+# Load environment variables - find .env file in app directory
+env_path = Path(__file__).parent.parent.parent / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # Try loading from app/.env
+    load_dotenv('app/.env')
 
 class Database:
     def __init__(self):

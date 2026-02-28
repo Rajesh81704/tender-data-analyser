@@ -117,3 +117,19 @@ class DashboardService:
                 "error": str(e)
             }
 
+    def get_all_tender_masters(self):
+        """Get all tender master records"""
+        try:
+            data = self.dashboard_dao.get_all_tender_masters()
+            return {
+                "success": True,
+                "data": data
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e)
+            }
+

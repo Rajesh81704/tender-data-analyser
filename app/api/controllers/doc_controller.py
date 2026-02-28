@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from app.api.services.doc_service import DocService
+from app.api.services.dashboard_service import DashboardService
 from app.api.services.auth_service import get_current_user
 import asyncio
 
@@ -7,6 +8,17 @@ router = APIRouter()
 
 def get_doc_service():
     return DocService()
+
+def get_dashboard_service():
+    return DashboardService()
+
+@router.get("/tender-masters")
+def get_all_tender_masters(
+    dashboard_service: DashboardService = Depends(get_dashboard_service)
+):
+    """Get all tender master records with details"""
+    result = dashboard_service.get_all_tender_masters()
+    return result
 
 @router.post("/upload-doc")
 async def upload_document(
