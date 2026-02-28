@@ -284,13 +284,13 @@ class DashboardDAO:
                 return {}
             
             response = {
-                "sanctioned": float(result[0]) if result[0] else 0,
-                "received": float(result[1]) if result[1] else 0,
-                "utilized_previous": float(result[2]) if result[2] else 0,
-                "utilized_current": float(result[3]) if result[3] else 0,
-                "total_utilized": float(result[4]) if result[4] else 0,
-                "amount_to_be_received": float(result[5]) if result[5] else 0,
-                "amount_to_be_utilized": float(result[6]) if result[6] else 0
+                "sanctioned": float(result[0]/100) if result[0] else 0,
+                "received": float(result[1]/100) if result[1] else 0,
+                "utilized_previous": float(result[2]/100) if result[2] else 0,
+                "utilized_current": float(result[3]/100) if result[3] else 0,
+                "total_utilized": float(result[4]/100) if result[4] else 0,
+                "amount_to_be_received": float(result[5]/100) if result[5] else 0,
+                "amount_to_be_utilized": float(result[6]/100) if result[6] else 0
             }
             
             # Cache the result
@@ -613,7 +613,6 @@ class DashboardDAO:
         finally:
             if conn:
                 self.db.release_connection(conn)
-
 
     def get_completion_stage_counts(self, tndr_pk: int):
         """Get aggregated project counts by completion stages"""
