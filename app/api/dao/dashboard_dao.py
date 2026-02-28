@@ -530,3 +530,87 @@ class DashboardDAO:
         finally:
             if conn:
                 self.db.release_connection(conn)
+
+    def get_department_completion_summary(self, tndr_pk: int, page: int = 1, page_size: int = 10):
+        """Get department-wise project count by completion stages with all project details"""
+        conn = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+
+            # Calculate offset
+            offset = (page - 1) * page_size
+
+            # Count query
+            count_query = f"""
+            SELECT COUNT(*)
+            FROM "TENDER_DATA_DTLS" t
+            WHERE t.tndr_pk = {tndr_pk}
+            """
+
+            cursor.execute(count_query)
+            total_count = cursor.fetchone()[0]
+
+            # Data query with pagination
+            query = f"""
+            SELECT
+                t."TDM_PK",
+                t."DISTRICT_CODE",
+                t."WORK_CODE",
+                t."DEPARTMENT_CODE",
+                t."PROJECT_NAME",
+                t."SANCTION_COST",
+                t."SANCTION_DATE",
+                t."FUND_RECEIVED",
+                t."FUND_RECEIVED_DATE",
+                t."WIP_PREVIOUS_YEAR",
+                t."WIP_CURRENT_YEAR",
+                t."WIP_CURRENT_MONTH",
+                t."WIP_TOTAL",
+                t."LAND_RECEIVED_DATE",
+                ROUND(COALESCE((t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100, 0)::numeric, 2) AS completion_percentage,
+                CASE
+                    WHEN (t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100 < 25 THEN 'Below 25%'
+                    WHEN (t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100 < 50 THEN '25–50%'
+                    WHEN (t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100 < 75 THEN '50–75%'
+                    WHEN (t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100 < 100 THEN '75–100%'
+                    ELSE 'Completed'
+                END AS progress_category
+            FROM "TENDER_DATA_DTLS" t
+            WHERE t.tndr_pk = {tndr_pk}
+            ORDER BY t."DEPARTMENT_CODE", t."PROJECT_NAME"
+            LIMIT {page_size} OFFSET {offset}
+            """
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+            cursor.close()
+
+            columns = ['tdm_pk', 'district_code', 'work_code', 'department_code', 'project_name',
+                      'sanction_cost', 'sanction_date', 'fund_received', 'fund_received_date',
+                      'wip_previous_year', 'wip_current_year', 'wip_current_month', 'wip_total',
+                      'land_received_date', 'completion_percentage', 'progress_category']
+
+            data = [dict(zip(columns, row)) for row in results]
+
+            # Convert Decimal to float before returning
+            data = decimal_to_float(data)
+
+            return {
+                'data': data,
+                'pagination': {
+                    'total': total_count,
+                    'page': page,
+                    'page_size': page_size,
+                    'total_pages': (total_count + page_size - 1) // page_size
+                }
+            }
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {'data': [], 'pagination': {'total': 0, 'page': page, 'page_size': page_size, 'total_pages': 0}}
+        finally:
+            if conn:
+                self.db.release_connection(conn)
+

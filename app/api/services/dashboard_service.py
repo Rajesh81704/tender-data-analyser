@@ -151,3 +151,20 @@ class DashboardService:
                 "error": str(e)
             }
 
+    def get_department_completion_summary(self, tndr_pk: int, page: int = 1, page_size: int = 10):
+        """Get department-wise project count by completion stages with pagination"""
+        try:
+            result = self.dashboard_dao.get_department_completion_summary(tndr_pk, page, page_size)
+            return {
+                "success": True,
+                "data": result.get("data", []),
+                "pagination": result.get("pagination", {})
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e)
+            }
+

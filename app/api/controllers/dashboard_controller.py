@@ -79,4 +79,15 @@ def get_projects_by_completion(
     result = dashboard_service.get_project_stage_summary(tndr_id, project_name, dept_code, page, page_size)
     return result
 
-    
+@router.get("/department-completion-summary")
+def get_department_completion_summary(
+    tndr_id: int = Query(..., description="Tender primary key"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    page_size: int = Query(10, ge=1, le=100, description="Number of items per page (max 100)"),
+    dashboard_service: DashboardService = Depends(get_dashboard_service)
+):
+    """Get all project details with completion percentage and category (<25%, 25-50%, 50-75%, 75-100%, Completed) with pagination"""
+    result = dashboard_service.get_department_completion_summary(tndr_id, page, page_size)
+    return result
+
+
