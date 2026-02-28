@@ -95,12 +95,12 @@ class DashboardDAO:
                 round(COALESCE(SUM(t."WIP_CURRENT_MONTH"), 0)::numeric/100, 3) as total_wip_current_month,
                 round(COALESCE(SUM(t."WIP_TOTAL"), 0)::numeric/100, 3) as total_wip_total,
                 round(COALESCE(AVG(t."PHYSICAL_PROGRESS"), 0)::numeric, 3) as avg_physical_progress,
-                MIN(t."SANCTION_DATE") as earliest_sanction_date,
-                MAX(t."SANCTION_DATE") as latest_sanction_date,
-                MIN(t."FUND_RECEIVED_DATE") as earliest_fund_received_date,
-                MAX(t."FUND_RECEIVED_DATE") as latest_fund_received_date,
-                MIN(t."LAND_RECEIVED_DATE") as earliest_land_received_date,
-                MAX(t."LAND_RECEIVED_DATE") as latest_land_received_date,
+                t."SANCTION_DATE" as earliest_sanction_date,
+                t."SANCTION_DATE" as latest_sanction_date,
+                t."FUND_RECEIVED_DATE" as earliest_fund_received_date,
+                t."FUND_RECEIVED_DATE" as latest_fund_received_date,
+                (t."LAND_RECEIVED_DATE") as earliest_land_received_date,
+                (t."LAND_RECEIVED_DATE") as latest_land_received_date,
                 COUNT(DISTINCT t."DISTRICT_CODE") as total_districts,
                 COUNT(DISTINCT t."WORK_CODE") as total_work_codes
             FROM "DEPT_DTLS" d
@@ -390,9 +390,9 @@ class DashboardDAO:
             if conn:
                 self.db.release_connection(conn)
 
-    def get_project_stage_summary(self, tndr_pk: int, page: int = 1, page_size: int = 10):
+    def get_project_stage_summary(self, tndr_pk: int, project_name: str = None, dept_code: str = None, page: int = 1, page_size: int = 10):
         """Get project stage summary with completion percentage and stage categorization with pagination"""
-        cache_key = f"dashboard:project_stage:{tndr_pk}:{page}:{page_size}"
+        cache_key = f"dashboard:project_stage:{tndr_pk}:{project_name or 'all'}:{dept_code or 'all'}:{page}:{page_size}"
         
         # Try cache first
         cached = redis_client.get(cache_key)
@@ -404,13 +404,40 @@ class DashboardDAO:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            base_query = query_loader.get_query("query.dashboard.get_project_stage_summary")
-            where_clause = f' AND t.tndr_pk = {tndr_pk}'
+            # Build query with dept_code and dept_name included
+            query = f"""
+            SELECT 
+                t."PROJECT_NAME" AS project_name,
+                ROUND(COALESCE(SUM(NULLIF(t."SANCTION_COST", 'NaN'::float)), 0)::NUMERIC, 2) AS sanctioned,
+                ROUND(COALESCE(SUM(NULLIF(t."FUND_RECEIVED", 'NaN'::float)), 0)::NUMERIC, 3) AS received,
+                d."DEPT_SUB_DEPT_CODE" AS dept_code,
+                d."DEPT_NAME" AS dept_name,
+                COALESCE(t."PHYSICAL_PROGRESS", 0) AS completion_percentage,
+                CASE 
+                    WHEN COALESCE(t."PHYSICAL_PROGRESS", 0) >= 100 THEN 'Completed'
+                    WHEN COALESCE(t."PHYSICAL_PROGRESS", 0) >= 75 THEN '>=75%'
+                    WHEN COALESCE(t."PHYSICAL_PROGRESS", 0) >= 50 THEN '>=50%'
+                    WHEN COALESCE(t."PHYSICAL_PROGRESS", 0) >= 25 THEN '>=25%'
+                    ELSE '<25%'
+                END AS project_stage
+            FROM "TENDER_DATA_DTLS" t
+            INNER JOIN "DEPT_DTLS" d 
+                ON t.tndr_pk = d.tndr_pk 
+                AND t."DEPARTMENT_CODE" = d."DEPT_SUB_DEPT_CODE"
+            WHERE d."DEPT_NAME" IS NOT NULL 
+                AND t.tndr_pk = {tndr_pk}
+            """
             
-            group_by = ' GROUP BY t."PROJECT_NAME", d."DEPT_NAME", t."PHYSICAL_PROGRESS"'
+            if project_name:
+                query += f' AND t."PROJECT_NAME" ILIKE \'%{project_name}%\''
+            
+            if dept_code:
+                query += f' AND d."DEPT_SUB_DEPT_CODE" = \'{dept_code}\''
+            
+            group_by = ' GROUP BY t."PROJECT_NAME", d."DEPT_SUB_DEPT_CODE", d."DEPT_NAME", t."PHYSICAL_PROGRESS"'
             
             # Count total items
-            count_query = f"SELECT COUNT(*) FROM ({base_query}{where_clause}{group_by}) as count_table"
+            count_query = f"SELECT COUNT(*) FROM ({query}{group_by}) as count_table"
             cursor.execute(count_query)
             total_items = cursor.fetchone()[0]
             
@@ -419,7 +446,7 @@ class DashboardDAO:
             offset = (page - 1) * page_size
             
             # Build final query with pagination
-            query = base_query + where_clause + group_by
+            query += group_by
             query += ' ORDER BY completion_percentage DESC'
             query += f' LIMIT {page_size} OFFSET {offset}'
             
@@ -428,7 +455,7 @@ class DashboardDAO:
             results = cursor.fetchall()
             cursor.close()
             
-            columns = ['project_name', 'sanctioned', 'received', 'department', 
+            columns = ['project_name', 'sanctioned', 'received', 'dept_code', 'dept_name',
                       'completion_percentage', 'project_stage']
             
             items = [dict(zip(columns, row)) for row in results]

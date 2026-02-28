@@ -113,10 +113,10 @@ class DashboardService:
                 "error": str(e)
             }
 
-    def get_project_stage_summary(self, tndr_pk: int, page: int = 1, page_size: int = 10):
+    def get_project_stage_summary(self, tndr_pk: int, project_name: str = None, dept_code: str = None, page: int = 1, page_size: int = 10):
         """Get project stage summary with completion percentage and stage categorization with pagination"""
         try:
-            data = self.dashboard_dao.get_project_stage_summary(tndr_pk, page, page_size)
+            data = self.dashboard_dao.get_project_stage_summary(tndr_pk, project_name, dept_code, page, page_size)
             return {
                 "success": True,
                 "data": data.get("items", []),
