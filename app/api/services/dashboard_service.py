@@ -17,15 +17,9 @@ class DashboardService:
         self.db = get_db()
 
     def get_overview(self, tndr_pk: int, dept_name: str = None):
-        dept_join = ""
         dept_filter = ""
         if dept_name:
-            dept_join = f"""
-            INNER JOIN "DEPT_DTLS" d
-                ON t.tndr_pk = d.tndr_pk
-                AND t."DEPARTMENT_CODE" = d."DEPT_SUB_DEPT_CODE"
-            """
-            dept_filter = f"AND d.\"DEPT_NAME\" ILIKE '%{dept_name}%'"
+            dept_filter = f"AND dd.\"DEPT_NAME\" ILIKE '%{dept_name}%'"
 
         query = f"""
         WITH calc AS (
@@ -38,15 +32,18 @@ class DashboardService:
                 t."WIP_TOTAL",
                 t."DEPARTMENT_CODE",
                 t."DISTRICT_CODE",
+                dd."DEPT_NAME",
                 ROUND(COALESCE((t."WIP_TOTAL" / NULLIF(t."SANCTION_COST", 0)) * 100, 0)::numeric, 2) AS physical_progress
             FROM "TENDER_DATA_DTLS" t
-            {dept_join}
+            LEFT JOIN "DEPT_DTLS" dd
+                ON t.tndr_pk = dd.tndr_pk
+                AND t."DEPARTMENT_CODE" = dd."DEPT_SUB_DEPT_CODE"
             WHERE t.tndr_pk = {tndr_pk}
             {dept_filter}
         )
         SELECT
             COUNT(*) AS total_projects,
-            COUNT(DISTINCT "DEPARTMENT_CODE") AS total_departments,
+            COUNT(DISTINCT "DEPT_NAME") AS total_departments,
             COUNT(DISTINCT "DISTRICT_CODE") AS total_districts,
             ROUND(COALESCE(SUM("SANCTION_COST"), 0)::numeric / 100, 3) AS total_sanction_cost,
             ROUND(COALESCE(SUM("FUND_RECEIVED"), 0)::numeric / 100, 3) AS total_fund_received,
