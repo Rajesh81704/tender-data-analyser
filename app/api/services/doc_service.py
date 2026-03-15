@@ -65,13 +65,18 @@ class DocService:
             if df.empty:
                 return {"error": "Excel file is empty, no data rows found"}
             
+            # Strip whitespace/tabs from all column names
+            df.columns = df.columns.str.strip()
+
+            print(f"DEBUG Service: Stripped columns: {df.columns.tolist()}")
+
             required_cols = [
                 'DST_CD,N,4,0', 'WRK_CD,N,4,0', 'DPT_CD,C,5', 'WRK_NM,C,32',
                 'SAN_COST,N,7,2', 'SAN_DT,D', 'F_CL,N,7,2', 'F_CL_DT,D',
-                'LND_DT,D', 'WIP_31,N,7,2', 'WIP_1,N,7,2', 'WIP_CM,N,7,2',
+                'LND_DT,D', 'WIP_31,N,7,2', 'WIP_1,N,7,2', 'WORK IN PROGRESS CURRENT MONTH',
                 'WIP_CR,N,7,2', 'PHY1,C,15'
             ]
-            
+
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
                 print(f"DEBUG Service: Missing columns: {missing_cols}")
