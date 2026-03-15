@@ -208,6 +208,35 @@ class DashboardService:
             if conn:
                 self.db.release_connection(conn)
 
+    def get_all_tender_masters(self):
+        query = """
+        SELECT
+            tndr_pk,
+            tndr_source_file,
+            dst_source_file,
+            dept_source_file,
+            crt_dt,
+            crt_user
+        FROM tender_master
+        ORDER BY crt_dt DESC
+        """
+        conn = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            cursor.close()
+            return {"success": True, "data": [dict(zip(columns, row)) for row in rows]}
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": str(e)}
+        finally:
+            if conn:
+                self.db.release_connection(conn)
+
     def get_projects_by_completion(self, tndr_pk: int, completion: str = None, page: int = 1, page_size: int = 10):
         completion_filter = ""
         if completion == "25":
@@ -286,6 +315,35 @@ class DashboardService:
                     "total_pages": (total + page_size - 1) // page_size
                 }
             }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": str(e)}
+        finally:
+            if conn:
+                self.db.release_connection(conn)
+
+    def get_all_tender_masters(self):
+        query = """
+        SELECT
+            tndr_pk,
+            tndr_source_file,
+            dst_source_file,
+            dept_source_file,
+            crt_dt,
+            crt_user
+        FROM tender_master
+        ORDER BY crt_dt DESC
+        """
+        conn = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            cursor.close()
+            return {"success": True, "data": [dict(zip(columns, row)) for row in rows]}
         except Exception as e:
             import traceback
             traceback.print_exc()
