@@ -31,9 +31,16 @@ class DocDAO:
     def create_master_record(self, master_records: dict):
         conn = None
         try:
+            insert_query = query_loader.get_query("query.tender.insert_tender_main")
+            print(f"DEBUG create_master_record: query={insert_query}")
+            print(f"DEBUG create_master_record: params={master_records}")
+
+            if not insert_query:
+                print("ERROR: query.tender.insert_tender_main not found in queries.properties")
+                return None
+
             conn = self.db.get_connection()
             cursor = conn.cursor()
-            insert_query = query_loader.get_query("query.tender.insert_tender_main")
             cursor.execute(insert_query, (
                 master_records.get("tender"),
                 master_records.get("district"),
@@ -42,6 +49,7 @@ class DocDAO:
                 master_records.get("created_by")
             ))
             result = cursor.fetchone()
+            print(f"DEBUG create_master_record: result={result}")
             conn.commit()
             cursor.close()
             return result[0] if result else None
@@ -49,7 +57,9 @@ class DocDAO:
         except Exception as e:
             if conn:
                 conn.rollback()
-            print(f"Error in create_master_record: {e}")
+            print(f"ERROR in create_master_record: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
         finally:
             if conn:
